@@ -1,13 +1,202 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Stacker</title>
-  </head>
-  <body>
-    <main>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stacker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background: #101524;
+      color: #f4f6ff;
+      font: 1rem system-ui, sans-serif;
+    }
+    main { width: min(100%, 390px); }
+    header { display: flex; align-items: baseline; justify-content: space-between; }
+    h1 { margin: 0; font-size: 2.5rem; letter-spacing: -.06em; }
+    #score { font-variant-numeric: tabular-nums; color: #8cebd7; }
+    p { color: #c0c9df; margin: 8px 0 16px; }
+    canvas {
+      width: 100%;
+      max-height: 58svh;
+      display: block;
+      border: 1px solid #3c4866;
+      border-radius: 16px;
+      background: #182137;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      border: 0;
+      border-radius: 10px;
+      background: #8cebd7;
+      color: #101524;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #status { min-height: 1.5em; margin-bottom: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
       <h1>Stacker</h1>
-    </main>
-  </body>
+      <span id="score">Score 0</span>
+    </header>
+    <p>Line up each block with the one below it. Tap the board or press Space to place it.</p>
+    <canvas id="board" width="720" height="900" aria-label="Stacker game board">
+      Your browser needs canvas support to play Stacker.
+    </canvas>
+    <button id="action" type="button">Start game</button>
+    <p id="status" role="status">Ready to play.</p>
+  </main>
+  <script>
+    const board = document.querySelector('#board');
+    const context = board.getContext('2d');
+    const action = document.querySelector('#action');
+    const score = document.querySelector('#score');
+    const status = document.querySelector('#status');
+
+    const width = 360;
+    const height = 450;
+    const ground = 406;
+    const blockHeight = 26;
+    const colors = ['#8cebd7', '#8db5ff', '#c2aaff', '#ffaecb', '#ffd39a'];
+    let tower;
+    let moving;
+    let debris;
+    let phase;
+    let camera;
+    let lastFrame;
+
+    function reset() {
+      tower = [{ x: 108, width: 144, y: ground - blockHeight, color: colors[0] }];
+      moving = null;
+      debris = [];
+      camera = 0;
+      phase = 'ready';
+      score.textContent = 'Score 0';
+    }
+
+    function spawn() {
+      const top = tower.at(-1);
+      moving = {
+        x: 0,
+        width: top.width,
+        y: top.y - blockHeight,
+        color: colors[tower.length % colors.length],
+        direction: 1
+      };
+    }
+
+    function play() {
+      if (phase !== 'playing') {
+        reset();
+        phase = 'playing';
+        action.textContent = 'Place block';
+        status.textContent = 'Place the block when it lines up.';
+        spawn();
+        return;
+      }
+
+      const top = tower.at(-1);
+      const movingRight = moving.x + moving.width;
+      const left = Math.max(moving.x, top.x);
+      const right = Math.min(movingRight, top.x + top.width);
+      if (right <= left) {
+        debris.push({ ...moving, age: 0, drift: moving.direction });
+        moving = null;
+        phase = 'over';
+        action.textContent = 'Play again';
+        status.textContent = 'Game over. Final score ' + (tower.length - 1) + '.';
+        return;
+      }
+
+      if (moving.x < left) {
+        debris.push({ ...moving, width: left - moving.x, age: 0, drift: -1 });
+      }
+      if (movingRight > right) {
+        debris.push({ ...moving, x: right, width: movingRight - right, age: 0, drift: 1 });
+      }
+
+      tower.push({ x: left, width: right - left, y: moving.y, color: moving.color });
+      score.textContent = 'Score ' + (tower.length - 1);
+      spawn();
+    }
+
+    function drawBlock(block) {
+      context.fillStyle = block.color;
+      context.fillRect(block.x, block.y, block.width, blockHeight - 1);
+      context.fillStyle = '#ffffff55';
+      context.fillRect(block.x, block.y, block.width, 3);
+    }
+
+    function frame(time) {
+      const elapsed = Math.min(0.035, (time - (lastFrame ?? time)) / 1000);
+      lastFrame = time;
+      if (moving) {
+        const speed = Math.min(320, 145 + (tower.length - 1) * 9);
+        const limit = width - moving.width;
+        moving.x += speed * elapsed * moving.direction;
+        if (moving.x >= limit || moving.x <= 0) {
+          moving.x = Math.max(0, Math.min(limit, moving.x));
+          moving.direction = moving.x === 0 ? 1 : -1;
+        }
+      }
+
+      const target = Math.max(0, 120 - (moving?.y ?? tower.at(-1).y - blockHeight));
+      camera += (target - camera) * Math.min(1, elapsed * 10);
+      context.setTransform(2, 0, 0, 2, 0, 0);
+      context.clearRect(0, 0, width, height);
+      context.fillStyle = '#25334f';
+      for (let y = 18; y < height; y += 24) {
+        for (let x = 12; x < width; x += 24) {
+          context.fillRect(x, y, 2, 2);
+        }
+      }
+      context.save();
+      context.translate(0, camera);
+      context.fillStyle = '#435374';
+      context.fillRect(0, ground, width, 2);
+      for (const block of tower) {
+        if (block.y + camera < height) drawBlock(block);
+      }
+      if (moving) drawBlock(moving);
+
+      for (const piece of debris) {
+        piece.age += elapsed;
+        context.save();
+        context.translate(piece.x + piece.width / 2 + piece.drift * 40 * piece.age,
+          piece.y + blockHeight / 2 + 440 * piece.age ** 2);
+        context.rotate(piece.drift * piece.age * 2);
+        drawBlock({ ...piece, x: -piece.width / 2, y: -blockHeight / 2 });
+        context.restore();
+      }
+      debris = debris.filter(piece => piece.age < 1.2);
+      context.restore();
+      requestAnimationFrame(frame);
+    }
+
+    action.addEventListener('click', play);
+    board.addEventListener('click', play);
+    document.addEventListener('keydown', event => {
+      if (event.code !== 'Space' || event.altKey || event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      if (!event.repeat) play();
+    });
+
+    reset();
+    requestAnimationFrame(frame);
+  </script>
+</body>
 </html>
