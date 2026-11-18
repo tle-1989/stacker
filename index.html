@@ -82,12 +82,19 @@
     let camera;
     let lastFrame;
     let sceneryTime = 0;
+    let goldFlash;
+    const flashDuration = 0.28;
+    const breakDuration = 0.14;
+    const alignmentTolerance = 1.5;
+    const backdrop = new Image();
+    backdrop.src = 'scenery.webp';
 
     function reset() {
       tower = [{ x: 108, width: 144, y: ground - blockHeight, color: colors[0] }];
       moving = null;
       debris = [];
       camera = 0;
+      goldFlash = 0;
       phase = 'ready';
       score.textContent = 'Score 0';
       altitude.textContent = 'Open sky · Clouds at 10 blocks';
@@ -115,6 +122,11 @@
       }
 
       const top = tower.at(-1);
+      const perfect = Math.abs(moving.x - top.x) <= alignmentTolerance;
+      if (perfect) {
+        moving.x = top.x;
+        goldFlash = flashDuration;
+      }
       const movingRight = moving.x + moving.width;
       const left = Math.max(moving.x, top.x);
       const right = Math.min(movingRight, top.x + top.width);
@@ -128,13 +140,14 @@
       }
 
       if (moving.x < left) {
-        debris.push({ ...moving, width: left - moving.x, age: 0, drift: -1 });
+        debris.push({ ...moving, width: left - moving.x, age: 0, drift: -1, breaking: true });
       }
       if (movingRight > right) {
-        debris.push({ ...moving, x: right, width: movingRight - right, age: 0, drift: 1 });
+        debris.push({ ...moving, x: right, width: movingRight - right, age: 0, drift: 1, breaking: true });
       }
 
       tower.push({ x: left, width: right - left, y: moving.y, color: moving.color });
+      status.textContent = perfect ? 'Perfect placement!' : 'Place the block when it lines up.';
       const blocks = tower.length - 1;
       score.textContent = 'Score ' + blocks;
       altitude.textContent = sceneAt(blocks).label;
@@ -146,6 +159,38 @@
       context.fillRect(block.x, block.y, block.width, blockHeight - 1);
       context.fillStyle = '#ffffff55';
       context.fillRect(block.x, block.y, block.width, 3);
+    }
+
+    function drawDebris(piece) {
+      const delay = piece.breaking ? breakDuration : 0;
+      const fall = Math.max(0, piece.age - delay);
+      const center = piece.width / 2;
+      context.save();
+      context.translate(piece.x + center + piece.drift * 40 * fall,
+        piece.y + blockHeight / 2 + 440 * fall ** 2);
+      context.rotate(piece.drift * fall * 2);
+      drawBlock({ ...piece, x: -center, y: -blockHeight / 2 });
+
+      if (piece.breaking && piece.age < breakDuration) {
+        const edge = -piece.drift * center;
+        const inset = Math.min(8, piece.width * 0.55);
+        context.strokeStyle = '#fff0ce';
+        context.lineWidth = 1.5;
+        context.beginPath();
+        context.moveTo(edge, -blockHeight / 2);
+        context.lineTo(edge + piece.drift * inset, -6);
+        context.lineTo(edge + piece.drift * inset * 0.35, 1);
+        context.lineTo(edge + piece.drift * inset, 7);
+        context.lineTo(edge, blockHeight / 2 - 1);
+        context.stroke();
+
+        for (let i = 0; i < 5; i++) {
+          const distance = piece.age * (65 + i * 11);
+          context.fillStyle = i % 2 ? piece.color : '#fff0ce';
+          context.fillRect(edge + piece.drift * distance, -10 + i * 4 - distance * 0.3, 2, 2);
+        }
+      }
+      context.restore();
     }
 
     const scenes = [
@@ -227,6 +272,16 @@
     }
 
     function drawSky(time, scene) {
+      if (scene.start < 40 && backdrop.naturalWidth) {
+        const tileWidth = backdrop.naturalWidth / 2;
+        const tileHeight = backdrop.naturalHeight / 2;
+        const tile = scene.start / 10;
+        const padding = 8;
+        context.drawImage(backdrop,
+          (tile % 2) * tileWidth + padding, Math.floor(tile / 2) * tileHeight + padding,
+          tileWidth - padding * 2, tileHeight - padding * 2, 0, 0, width, height);
+        return;
+      }
       const sky = context.createLinearGradient(0, 0, 0, height);
       sky.addColorStop(0, scene.top);
       sky.addColorStop(1, scene.bottom);
@@ -286,6 +341,7 @@
       const elapsed = Math.min(0.035, (time - (lastFrame ?? time)) / 1000);
       lastFrame = time;
       sceneryTime += elapsed;
+      goldFlash = Math.max(0, goldFlash - elapsed);
       if (moving) {
         const speed = Math.min(320, 145 + (tower.length - 1) * 9);
         const limit = width - moving.width;
@@ -308,20 +364,24 @@
       context.translate(0, camera + bob);
       if (onRaft) drawRaft();
       for (const block of tower) {
-        if (block.y + camera < height) drawBlock(block);
+        if (block.y + camera >= height) continue;
+        drawBlock(block);
+        if (goldFlash > 0) {
+          context.save();
+          context.globalAlpha = Math.min(1, goldFlash / 0.14);
+          context.shadowColor = '#ffd76a';
+          context.shadowBlur = 12;
+          drawBlock({ ...block, color: '#f8bd3d' });
+          context.restore();
+        }
       }
       if (moving) drawBlock(moving);
 
       for (const piece of debris) {
         piece.age += elapsed;
-        context.save();
-        context.translate(piece.x + piece.width / 2 + piece.drift * 40 * piece.age,
-          piece.y + blockHeight / 2 + 440 * piece.age ** 2);
-        context.rotate(piece.drift * piece.age * 2);
-        drawBlock({ ...piece, x: -piece.width / 2, y: -blockHeight / 2 });
-        context.restore();
+        drawDebris(piece);
       }
-      debris = debris.filter(piece => piece.age < 1.2);
+      debris = debris.filter(piece => piece.age < 1.2 + breakDuration);
       context.restore();
       requestAnimationFrame(frame);
     }
