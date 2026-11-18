@@ -261,9 +261,26 @@
     }
 
     function drawEarth() {
-      const x = 270;
-      const y = 86;
-      const radius = 52;
+      // Follow the smoothed camera so Earth recedes continuously as we climb.
+      const orbitStart = 120 - (ground - blockHeight * 22);
+      const progress = Math.max(0, Math.min(1, (camera - orbitStart) / (9 * blockHeight)));
+      const x = 200 + progress * 42;
+      const y = 298 + progress * 84;
+      const radius = 83 - progress * 36;
+
+      if (backdrop.naturalWidth) {
+        // The globe occupies this region of the scenery atlas's lower-left tile.
+        const sx = backdrop.naturalWidth / 1122;
+        const sy = backdrop.naturalHeight / 1402;
+        context.save();
+        context.beginPath();
+        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.clip();
+        context.drawImage(backdrop, 164 * sx, 738 * sy, 232 * sx, 232 * sy,
+          x - radius, y - radius, radius * 2, radius * 2);
+        context.restore();
+        return;
+      }
       const glow = context.createRadialGradient(x - 17, y - 18, 4, x, y, radius);
       glow.addColorStop(0, '#83ebf1');
       glow.addColorStop(1, '#245bb6');
@@ -320,7 +337,7 @@
     }
 
     function drawSky(time, scene) {
-      if (scene.start < 40 && backdrop.naturalWidth) {
+      if (scene.start < 40 && scene.start !== 20 && backdrop.naturalWidth) {
         const tileWidth = backdrop.naturalWidth / 2;
         const tileHeight = backdrop.naturalHeight / 2;
         const tile = scene.start / 10;
