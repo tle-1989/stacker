@@ -44,6 +44,7 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+    #altitude { margin: 8px 0 0; font-size: .875rem; color: #8cebd7; }
     #status { min-height: 1.5em; margin-bottom: 0; }
   </style>
 </head>
@@ -59,6 +60,7 @@
       Your browser needs canvas support to play Stacker.
     </canvas>
     <button id="action" type="button">Start game</button>
+    <p id="altitude">Open sky · Space at 20 blocks</p>
     <p id="status" role="status">Ready to play.</p>
   </main>
   <script>
@@ -66,6 +68,7 @@
     const context = board.getContext('2d');
     const action = document.querySelector('#action');
     const score = document.querySelector('#score');
+    const altitude = document.querySelector('#altitude');
     const status = document.querySelector('#status');
 
     const width = 360;
@@ -79,6 +82,7 @@
     let phase;
     let camera;
     let lastFrame;
+    let sceneryTime = 0;
 
     function reset() {
       tower = [{ x: 108, width: 144, y: ground - blockHeight, color: colors[0] }];
@@ -87,6 +91,7 @@
       camera = 0;
       phase = 'ready';
       score.textContent = 'Score 0';
+      altitude.textContent = 'Open sky · Space at 20 blocks';
     }
 
     function spawn() {
@@ -131,7 +136,9 @@
       }
 
       tower.push({ x: left, width: right - left, y: moving.y, color: moving.color });
-      score.textContent = 'Score ' + (tower.length - 1);
+      const blocks = tower.length - 1;
+      score.textContent = 'Score ' + blocks;
+      if (blocks >= 20) altitude.textContent = 'Space · ' + planetAt(blocks).name;
       spawn();
     }
 
@@ -142,9 +149,121 @@
       context.fillRect(block.x, block.y, block.width, 3);
     }
 
+    const planets = [
+      { name: 'Earth', light: '#83ebd5', dark: '#245bb6' },
+      { name: 'Mars', light: '#ffb07b', dark: '#a64332' },
+      { name: 'Jupiter', light: '#f9d4a7', dark: '#a76554', bands: true },
+      { name: 'Saturn', light: '#ffe8a2', dark: '#ac784a', rings: true },
+      { name: 'Neptune', light: '#83c7ff', dark: '#384db4' }
+    ];
+
+    function planetAt(blocks) {
+      return planets[Math.floor((blocks - 20) / 5) % planets.length];
+    }
+
+    function ellipse(x, y, rx, ry, color) {
+      context.fillStyle = color;
+      context.beginPath();
+      context.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    function drawPlanet(planet) {
+      const x = 264;
+      const y = 78;
+      const radius = 46;
+      const glow = context.createRadialGradient(x - 14, y - 16, 3, x, y, radius);
+      glow.addColorStop(0, planet.light);
+      glow.addColorStop(1, planet.dark);
+      ellipse(x, y, radius, radius, glow);
+
+      context.save();
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.clip();
+      if (planet.bands) {
+        for (let band = -28; band <= 30; band += 11) {
+          ellipse(x, y + band, radius, 3, '#9a554c66');
+        }
+        ellipse(x + 16, y + 14, 12, 5, '#a64d43');
+      }
+      if (planet.name === 'Earth') {
+        ellipse(x - 15, y - 9, 17, 9, '#61bb87');
+        ellipse(x - 8, y + 2, 8, 16, '#61bb87');
+        ellipse(x + 23, y + 13, 11, 7, '#69c09a');
+      }
+      context.restore();
+
+      if (planet.rings) {
+        context.strokeStyle = '#efd5a9bb';
+        context.lineWidth = 6;
+        context.beginPath();
+        context.ellipse(x, y, 68, 14, -0.32, 0, Math.PI);
+        context.stroke();
+      }
+    }
+
+    function drawSky(time, blocks) {
+      const space = blocks >= 20;
+      const sky = context.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, space ? '#080b22' : '#287faf');
+      sky.addColorStop(1, space ? '#272755' : '#c5eef3');
+      context.fillStyle = sky;
+      context.fillRect(0, 0, width, height);
+
+      if (space) {
+        for (let i = 0; i < 76; i++) {
+          const x = (i * 137 + 19) % width;
+          const y = (i * i * 53 + 31) % height;
+          const radius = i % 9 === 0 ? 1.6 : 0.8;
+          ellipse(x, y, radius, radius, i % 3 === 0 ? '#eef3ff' : '#a5b4e288');
+        }
+        drawPlanet(planetAt(blocks));
+        return;
+      }
+
+      ellipse(279, 62, 25, 25, '#fff2ba');
+      for (let i = 0; i < 5; i++) {
+        const x = ((i * 143 + time * (8 + i)) % (width + 120)) - 60;
+        const y = 35 + i * 54 + camera * 0.20;
+        ellipse(x, y, 44, 10, '#f3fcffbb');
+        ellipse(x - 13, y - 5, 18, 12, '#f3fcffbb');
+        ellipse(x + 12, y - 10, 18, 14, '#f3fcffbb');
+      }
+    }
+
+    function drawWater(time) {
+      const surface = ground + camera + 10;
+      if (surface >= height + 8) return;
+      for (let layer = 0; layer < 3; layer++) {
+        context.fillStyle = ['#35aabe', '#228aa6', '#186f90'][layer];
+        context.beginPath();
+        context.moveTo(0, height);
+        for (let x = 0; x <= width; x += 4) {
+          const y = surface + layer * 12 + Math.sin(x / 24 - time * (2 + layer)) * 3;
+          context.lineTo(x, y);
+        }
+        context.lineTo(width, height);
+        context.closePath();
+        context.fill();
+      }
+    }
+
+    function drawRaft() {
+      context.fillStyle = '#704327';
+      context.fillRect(82, ground, 196, 15);
+      context.fillStyle = '#c88a50';
+      context.fillRect(82, ground, 196, 6);
+      for (let x = 94; x < 278; x += 24) {
+        context.fillStyle = '#dfaa71';
+        context.fillRect(x, ground + 2, 3, 12);
+      }
+    }
+
     function frame(time) {
       const elapsed = Math.min(0.035, (time - (lastFrame ?? time)) / 1000);
       lastFrame = time;
+      sceneryTime += elapsed;
       if (moving) {
         const speed = Math.min(320, 145 + (tower.length - 1) * 9);
         const limit = width - moving.width;
@@ -158,17 +277,11 @@
       const target = Math.max(0, 120 - (moving?.y ?? tower.at(-1).y - blockHeight));
       camera += (target - camera) * Math.min(1, elapsed * 10);
       context.setTransform(2, 0, 0, 2, 0, 0);
-      context.clearRect(0, 0, width, height);
-      context.fillStyle = '#25334f';
-      for (let y = 18; y < height; y += 24) {
-        for (let x = 12; x < width; x += 24) {
-          context.fillRect(x, y, 2, 2);
-        }
-      }
+      drawSky(sceneryTime, tower.length - 1);
+      drawWater(sceneryTime);
       context.save();
-      context.translate(0, camera);
-      context.fillStyle = '#435374';
-      context.fillRect(0, ground, width, 2);
+      context.translate(0, camera + Math.sin(sceneryTime * 2.4) * 2);
+      drawRaft();
       for (const block of tower) {
         if (block.y + camera < height) drawBlock(block);
       }
