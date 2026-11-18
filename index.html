@@ -59,7 +59,7 @@
       Your browser needs canvas support to play Stacker.
     </canvas>
     <button id="action" type="button">Start game</button>
-    <p id="altitude">Open sky · Space at 20 blocks</p>
+    <p id="altitude">Open sky · Clouds at 10 blocks</p>
     <p id="status" role="status">Ready to play.</p>
   </main>
   <script>
@@ -90,7 +90,7 @@
       camera = 0;
       phase = 'ready';
       score.textContent = 'Score 0';
-      altitude.textContent = 'Open sky · Space at 20 blocks';
+      altitude.textContent = 'Open sky · Clouds at 10 blocks';
     }
 
     function spawn() {
@@ -137,7 +137,7 @@
       tower.push({ x: left, width: right - left, y: moving.y, color: moving.color });
       const blocks = tower.length - 1;
       score.textContent = 'Score ' + blocks;
-      if (blocks >= 20) altitude.textContent = 'Space · ' + planetAt(blocks).name;
+      altitude.textContent = sceneAt(blocks).label;
       spawn();
     }
 
@@ -148,16 +148,16 @@
       context.fillRect(block.x, block.y, block.width, 3);
     }
 
-    const planets = [
-      { name: 'Earth', light: '#83ebd5', dark: '#245bb6' },
-      { name: 'Mars', light: '#ffb07b', dark: '#a64332' },
-      { name: 'Jupiter', light: '#f9d4a7', dark: '#a76554', bands: true },
-      { name: 'Saturn', light: '#ffe8a2', dark: '#ac784a', rings: true },
-      { name: 'Neptune', light: '#83c7ff', dark: '#384db4' }
+    const scenes = [
+      { start: 0, label: 'Open sky · Clouds at 10 blocks', top: '#287faf', bottom: '#c5eef3' },
+      { start: 10, label: 'Clouds · Space at 20 blocks', top: '#519bd1', bottom: '#edf8ff' },
+      { start: 20, label: 'Space · Earth', top: '#080b22', bottom: '#272755' },
+      { start: 30, label: 'Mars surface', top: '#5f2c35', bottom: '#eaa37b' },
+      { start: 40, label: 'Deep space', top: '#000', bottom: '#000' }
     ];
 
-    function planetAt(blocks) {
-      return planets[Math.floor((blocks - 20) / 5) % planets.length];
+    function sceneAt(blocks) {
+      return scenes.findLast(scene => blocks >= scene.start);
     }
 
     function ellipse(x, y, rx, ry, color) {
@@ -167,67 +167,90 @@
       context.fill();
     }
 
-    function drawPlanet(planet) {
-      const x = 264;
-      const y = 78;
-      const radius = 46;
-      const glow = context.createRadialGradient(x - 14, y - 16, 3, x, y, radius);
-      glow.addColorStop(0, planet.light);
-      glow.addColorStop(1, planet.dark);
+    function drawEarth() {
+      const x = 270;
+      const y = 86;
+      const radius = 52;
+      const glow = context.createRadialGradient(x - 17, y - 18, 4, x, y, radius);
+      glow.addColorStop(0, '#83ebf1');
+      glow.addColorStop(1, '#245bb6');
+      ellipse(x, y, radius + 2, radius + 2, '#89caff66');
       ellipse(x, y, radius, radius, glow);
 
       context.save();
       context.beginPath();
       context.arc(x, y, radius, 0, Math.PI * 2);
       context.clip();
-      if (planet.bands) {
-        for (let band = -28; band <= 30; band += 11) {
-          ellipse(x, y + band, radius, 3, '#9a554c66');
-        }
-        ellipse(x + 16, y + 14, 12, 5, '#a64d43');
-      }
-      if (planet.name === 'Earth') {
-        ellipse(x - 15, y - 9, 17, 9, '#61bb87');
-        ellipse(x - 8, y + 2, 8, 16, '#61bb87');
-        ellipse(x + 23, y + 13, 11, 7, '#69c09a');
-      }
+      ellipse(x - 15, y - 9, 17, 9, '#61bb87');
+      ellipse(x - 8, y + 2, 8, 16, '#61bb87');
+      ellipse(x + 23, y + 13, 11, 7, '#69c09a');
+      ellipse(x + 13, y - 23, 26, 3, '#ffffff80');
       context.restore();
+    }
 
-      if (planet.rings) {
-        context.strokeStyle = '#efd5a9bb';
-        context.lineWidth = 6;
-        context.beginPath();
-        context.ellipse(x, y, 68, 14, -0.32, 0, Math.PI);
-        context.stroke();
+    function drawStars() {
+      for (let i = 0; i < 76; i++) {
+        const x = (i * 137 + 19) % width;
+        const y = (i * i * 53 + 31) % height;
+        const radius = i % 9 === 0 ? 1.6 : 0.8;
+        ellipse(x, y, radius, radius, i % 3 === 0 ? '#eef3ff' : '#a5b4e288');
       }
     }
 
-    function drawSky(time, blocks) {
-      const space = blocks >= 20;
+    function drawMars() {
+      const ridges = [
+        { color: '#ae5e4f', y: 290, points: [46, -35, 90, 5, 143, -24, 190, 11, 263, -49, 320, 8] },
+        { color: '#8c453d', y: 337, points: [40, 12, 116, -18, 161, 6, 230, -14, 295, 14] },
+        { color: '#67332f', y: 389, points: [64, -10, 136, 12, 220, -12, 298, 8] }
+      ];
+      for (const ridge of ridges) {
+        context.fillStyle = ridge.color;
+        context.beginPath();
+        context.moveTo(0, ridge.y);
+        for (let i = 0; i < ridge.points.length; i += 2) {
+          context.lineTo(ridge.points[i], ridge.y + ridge.points[i + 1]);
+        }
+        context.lineTo(width, ridge.y);
+        context.lineTo(width, height);
+        context.lineTo(0, height);
+        context.closePath();
+        context.fill();
+      }
+      ellipse(75, 415, 29, 6, '#49252288');
+      ellipse(283, 433, 46, 9, '#49252288');
+    }
+
+    function drawCloud(x, y, scale, color) {
+      ellipse(x, y, 48 * scale, 12 * scale, color);
+      ellipse(x - 16 * scale, y - 7 * scale, 22 * scale, 15 * scale, color);
+      ellipse(x + 12 * scale, y - 13 * scale, 25 * scale, 20 * scale, color);
+    }
+
+    function drawSky(time, scene) {
       const sky = context.createLinearGradient(0, 0, 0, height);
-      sky.addColorStop(0, space ? '#080b22' : '#287faf');
-      sky.addColorStop(1, space ? '#272755' : '#c5eef3');
+      sky.addColorStop(0, scene.top);
+      sky.addColorStop(1, scene.bottom);
       context.fillStyle = sky;
       context.fillRect(0, 0, width, height);
 
-      if (space) {
-        for (let i = 0; i < 76; i++) {
-          const x = (i * 137 + 19) % width;
-          const y = (i * i * 53 + 31) % height;
-          const radius = i % 9 === 0 ? 1.6 : 0.8;
-          ellipse(x, y, radius, radius, i % 3 === 0 ? '#eef3ff' : '#a5b4e288');
-        }
-        drawPlanet(planetAt(blocks));
+      if (scene.start === 30) {
+        drawMars();
+        return;
+      }
+      if (scene.start >= 20) {
+        drawStars();
+        if (scene.start === 20) drawEarth();
         return;
       }
 
-      ellipse(279, 62, 25, 25, '#fff2ba');
-      for (let i = 0; i < 5; i++) {
-        const x = ((i * 143 + time * (8 + i)) % (width + 120)) - 60;
-        const y = 35 + i * 54 + camera * 0.20;
-        ellipse(x, y, 44, 10, '#f3fcffbb');
-        ellipse(x - 13, y - 5, 18, 12, '#f3fcffbb');
-        ellipse(x + 12, y - 10, 18, 14, '#f3fcffbb');
+      const cloudLayer = scene.start === 10;
+      if (!cloudLayer) ellipse(279, 62, 25, 25, '#fff2ba');
+      const count = cloudLayer ? 9 : 5;
+      for (let i = 0; i < count; i++) {
+        const x = ((i * 143 + time * (8 + i)) % (width + 190)) - 95;
+        const y = cloudLayer ? 48 + i * 46 : 35 + i * 54 + camera * 0.20;
+        const scale = cloudLayer ? 1.2 + (i % 3) * 0.22 : 0.9;
+        drawCloud(x, y, scale, cloudLayer ? '#f7fcffe8' : '#f3fcffbb');
       }
     }
 
@@ -276,11 +299,14 @@
       const target = Math.max(0, 120 - (moving?.y ?? tower.at(-1).y - blockHeight));
       camera += (target - camera) * Math.min(1, elapsed * 10);
       context.setTransform(2, 0, 0, 2, 0, 0);
-      drawSky(sceneryTime, tower.length - 1);
-      drawWater(sceneryTime);
+      const scene = sceneAt(tower.length - 1);
+      drawSky(sceneryTime, scene);
+      const onRaft = scene.start === 0;
+      if (onRaft) drawWater(sceneryTime);
       context.save();
-      context.translate(0, camera + Math.sin(sceneryTime * 2.4) * 2);
-      drawRaft();
+      const bob = onRaft ? Math.sin(sceneryTime * 2.4) * 2 : 0;
+      context.translate(0, camera + bob);
+      if (onRaft) drawRaft();
       for (const block of tower) {
         if (block.y + camera < height) drawBlock(block);
       }
