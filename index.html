@@ -44,6 +44,11 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+    #leaderboard { margin-top: 18px; padding: 14px; border: 1px solid #3c4866; border-radius: 12px; }
+    #leaderboard h2 { margin: 0; font-size: 1.125rem; }
+    #leaderboard ol { margin: 8px 0; padding-left: 24px; }
+    #leaderboard p { margin-bottom: 0; }
+    #leaderboard input { width: 100%; padding: 8px; font: inherit; }
     #altitude { margin: 8px 0 0; font-size: .875rem; color: #8cebd7; }
     #status { min-height: 1.5em; margin-bottom: 0; }
   </style>
@@ -61,6 +66,16 @@
     <button id="action" type="button">Start game</button>
     <p id="altitude">Open sky · Clouds at 10 blocks</p>
     <p id="status" role="status">Ready to play.</p>
+    <section id="leaderboard" aria-labelledby="leaderboard-title">
+      <h2 id="leaderboard-title">Top 3 players</h2>
+      <ol></ol>
+      <p role="status">Loading scores…</p>
+      <form hidden>
+        <label for="player-name">Leaderboard name</label>
+        <input id="player-name" required maxlength="24" autocomplete="nickname">
+        <button type="submit">Submit score</button>
+      </form>
+    </section>
   </main>
   <script>
     const board = document.querySelector('#board');
@@ -138,7 +153,9 @@
         moving = null;
         phase = 'over';
         action.textContent = 'Play again';
-        status.textContent = 'Game over. Final score ' + (tower.length - 1) + '.';
+        const finalScore = tower.length - 1;
+        status.textContent = 'Game over. Final score ' + finalScore + '.';
+        window.dispatchEvent(new CustomEvent('stacker:round-end', { detail: finalScore }));
         return;
       }
 
@@ -453,6 +470,7 @@
     action.addEventListener('click', play);
     board.addEventListener('click', play);
     document.addEventListener('keydown', event => {
+      if (event.target?.closest?.('#leaderboard')) return;
       if (event.code !== 'Space' || event.altKey || event.ctrlKey || event.metaKey) return;
       event.preventDefault();
       if (!event.repeat) play();
@@ -461,5 +479,7 @@
     reset();
     requestAnimationFrame(frame);
   </script>
+  <script src="leaderboard-config.js"></script>
+  <script src="leaderboard.js"></script>
 </body>
 </html>
