@@ -82,6 +82,9 @@
     let phase;
     let camera;
     let lastFrame;
+    const stoneTexture = new Image();
+    stoneTexture.src = '../stone.webp';
+
     let sceneryTime = 0;
     let goldFlash;
     const flashDuration = 0.28;
@@ -144,10 +147,16 @@
         debris.push({ ...moving, width: left - moving.x, age: 0, drift: -1, breaking: true });
       }
       if (movingRight > right) {
-        debris.push({ ...moving, x: right, width: movingRight - right, age: 0, drift: 1, breaking: true });
+        debris.push({ ...moving, x: right, width: movingRight - right, textureOffset: right - moving.x, age: 0, drift: 1, breaking: true });
       }
 
-      tower.push({ x: left, width: right - left, y: moving.y, color: moving.color });
+      tower.push({
+        x: left,
+        width: right - left,
+        y: moving.y,
+        color: moving.color,
+        textureOffset: left - moving.x
+      });
       status.textContent = perfect ? 'Perfect placement!' : 'Place the block when it lines up.';
       const blocks = tower.length - 1;
       score.textContent = 'Score ' + blocks;
@@ -156,10 +165,48 @@
     }
 
     function drawBlock(block) {
-      context.fillStyle = block.color;
-      context.fillRect(block.x, block.y, block.width, blockHeight - 1);
-      context.fillStyle = '#ffffff55';
-      context.fillRect(block.x, block.y, block.width, 3);
+      const { x, y, width, color } = block;
+      const faceHeight = blockHeight - 1;
+      const bevel = Math.min(3, width / 3);
+      const gold = color === '#f8bd3d';
+      const lighting = context.createLinearGradient(0, y, 0, y + faceHeight);
+      lighting.addColorStop(0, '#ffffff55');
+      lighting.addColorStop(0.45, '#ffffff00');
+      lighting.addColorStop(1, '#171d2b88');
+
+      context.save();
+      context.beginPath();
+      context.moveTo(x + bevel, y);
+      context.lineTo(x + width - bevel, y);
+      context.lineTo(x + width, y + bevel);
+      context.lineTo(x + width, y + faceHeight - bevel);
+      context.lineTo(x + width - bevel, y + faceHeight);
+      context.lineTo(x + bevel, y + faceHeight);
+      context.lineTo(x, y + faceHeight - bevel);
+      context.lineTo(x, y + bevel);
+      context.closePath();
+      context.fillStyle = color;
+      context.fill();
+      context.clip();
+
+      if (stoneTexture.naturalWidth) {
+        const opacity = context.globalAlpha;
+        context.globalAlpha *= gold ? 0.12 : 0.46;
+        context.drawImage(stoneTexture,
+          (block.textureOffset ?? 0) * 2, 0, width * 2, faceHeight * 2,
+          x, y, width, faceHeight);
+        context.globalAlpha = opacity;
+      }
+
+      context.fillStyle = lighting;
+      context.fillRect(x, y, width, faceHeight);
+      context.fillStyle = gold ? '#fff2baaa' : '#ffffff85';
+      context.fillRect(x, y, width, bevel);
+      context.fillRect(x, y + bevel, bevel, faceHeight - bevel);
+      context.fillStyle = '#1a223966';
+      context.fillRect(x, y + faceHeight - bevel, width, bevel);
+      context.fillRect(x + width - bevel, y + bevel, bevel, faceHeight - bevel);
+      context.restore();
     }
 
     function drawDebris(piece) {
