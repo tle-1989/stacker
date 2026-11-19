@@ -429,7 +429,7 @@
       context.save();
       context.font = '600 11px system-ui, sans-serif';
       context.textAlign = 'center';
-      leaderboardTowers.forEach(({ score }, index) => {
+      leaderboardTowers.forEach(({ player_name, score }, index) => {
         const x = index === 0 ? 38 : width - 38;
         const top = base - (score + 1) * blockHeight;
         const first = Math.min(score, Math.max(0, Math.floor((base - height) / blockHeight)));
@@ -445,9 +445,11 @@
 
         const labelY = Math.max(10, Math.min(height - 24, top - 23));
         context.fillStyle = '#101524cc';
-        context.fillRect(x - 31, labelY, 62, 18);
+        const labelWidth = Math.min(122, Math.max(40, context.measureText(player_name).width + 12));
+        const labelX = Math.max(7, Math.min(width - 7 - labelWidth, x - labelWidth / 2));
+        context.fillRect(labelX, labelY, labelWidth, 18);
         context.fillStyle = '#f4f6ff';
-        context.fillText('#' + (index + 1) + ' · ' + score, x, labelY + 13, 56);
+        context.fillText(player_name, labelX + labelWidth / 2, labelY + 13, labelWidth - 12);
       });
       context.restore();
     }
