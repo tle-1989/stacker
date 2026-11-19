@@ -30,6 +30,7 @@
 
   async function refresh(emptyMessage = 'No scores yet.') {
     const scores = await (await rpc('stacker_top_scores')).json();
+    window.dispatchEvent(new CustomEvent('stacker:leaderboard', { detail: scores.slice(0, 2) }));
     list.replaceChildren(...scores.map(({ player_name, score }) => {
       const row = document.createElement('li');
       row.textContent = player_name + ' · ' + score;

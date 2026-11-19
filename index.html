@@ -418,6 +418,39 @@
       }
     }
 
+    let leaderboardTowers = [];
+    window.addEventListener('stacker:leaderboard', ({ detail }) => {
+      leaderboardTowers = detail.slice(0, 2);
+    });
+
+    function drawLeaderboardTowers(bob) {
+      const base = ground + camera + bob;
+      context.save();
+      context.font = '600 11px system-ui, sans-serif';
+      context.textAlign = 'center';
+      leaderboardTowers.forEach(({ score }, index) => {
+        const x = index === 0 ? 38 : width - 38;
+        const top = base - (score + 1) * blockHeight;
+        const first = Math.min(score, Math.max(0, Math.floor((base - height) / blockHeight)));
+        const end = Math.min(score + 1, Math.ceil(base / blockHeight));
+
+        context.fillStyle = '#17273d66';
+        context.strokeStyle = '#e9f2ff70';
+        for (let level = first; level < end; level++) {
+          const y = base - (level + 1) * blockHeight;
+          context.fillRect(x - 17, y, 34, blockHeight - 1);
+          context.strokeRect(x - 17.5, y + 0.5, 35, blockHeight - 2);
+        }
+
+        const labelY = Math.max(10, Math.min(height - 24, top - 23));
+        context.fillStyle = '#101524cc';
+        context.fillRect(x - 31, labelY, 62, 18);
+        context.fillStyle = '#f4f6ff';
+        context.fillText('#' + (index + 1) + ' · ' + score, x, labelY + 13, 56);
+      });
+      context.restore();
+    }
+
     function frame(time) {
       const elapsed = Math.min(0.035, (time - (lastFrame ?? time)) / 1000);
       lastFrame = time;
@@ -440,8 +473,9 @@
       drawSky(sceneryTime, scene);
       const onRaft = scene.start === 0;
       if (onRaft) drawWater(sceneryTime);
-      context.save();
       const bob = onRaft ? Math.sin(sceneryTime * 2.4) * 2 : 0;
+      drawLeaderboardTowers(bob);
+      context.save();
       context.translate(0, camera + bob);
       if (onRaft) drawRaft();
       for (const block of tower) {
