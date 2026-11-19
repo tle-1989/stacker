@@ -390,21 +390,63 @@
       }
     }
 
-    function drawWater(time) {
+    function drawWater(time, bob) {
       const surface = ground + camera + 10;
       if (surface >= height + 8) return;
-      for (let layer = 0; layer < 3; layer++) {
-        context.fillStyle = ['#35aabe', '#228aa6', '#186f90'][layer];
-        context.beginPath();
-        context.moveTo(0, height);
-        for (let x = 0; x <= width; x += 4) {
-          const y = surface + layer * 12 + Math.sin(x / 24 - time * (2 + layer)) * 3;
-          context.lineTo(x, y);
+      const waveY = x => surface + Math.sin(x / 32 - time * 2.2) * 2
+        + Math.sin(x / 12 + time * 1.4) * 0.8;
+
+      context.save();
+      context.beginPath();
+      context.moveTo(0, height);
+      for (let x = 0; x <= width; x += 4) context.lineTo(x, waveY(x));
+      context.lineTo(width, height);
+      context.closePath();
+      context.clip();
+
+      const shading = context.createLinearGradient(0, surface, 0, surface + 38);
+      shading.addColorStop(0, '#397ba7');
+      shading.addColorStop(1, '#133f66');
+      context.fillStyle = shading;
+      context.fillRect(0, surface - 4, width, 42);
+
+      if (backdrop.naturalWidth) {
+        // Sample the photographed ocean at the bottom of the upper-left tile.
+        const sx = backdrop.naturalWidth / 1122;
+        const sy = backdrop.naturalHeight / 1402;
+        for (let row = 0; row < 40; row += 2) {
+          const drift = Math.sin(row * 0.31 - time * 2.5) * (6 + row * 0.23);
+          context.drawImage(backdrop, 28 * sx, (659 + row * 0.9) * sy,
+            505 * sx, 3 * sy, drift - 22, surface - 4 + row, width + 44, 2);
         }
-        context.lineTo(width, height);
-        context.closePath();
-        context.fill();
       }
+
+      for (let ripple = 0; ripple < 18; ripple++) {
+        const x = ((ripple * 73 + time * (11 + ripple % 5)) % (width + 36)) - 18;
+        const depth = 3 + (ripple * 13) % 29;
+        const y = waveY(x) + depth;
+        const length = 4 + (ripple % 6) * 2;
+        const shimmer = 0.11 + 0.13 * (1 + Math.sin(time * 3 + ripple)) / 2;
+        context.strokeStyle = 'rgba(218, 246, 255, ' + shimmer + ')';
+        context.lineWidth = 0.8;
+        context.beginPath();
+        context.moveTo(x, y);
+        context.quadraticCurveTo(x + length / 2, y - 1.8, x + length, y);
+        context.stroke();
+      }
+
+      const wakeY = ground + camera + bob + 15;
+      context.strokeStyle = '#d8f5ff70';
+      context.lineWidth = 1.25;
+      for (const edge of [82, 278]) {
+        const direction = edge === 82 ? -1 : 1;
+        context.beginPath();
+        context.moveTo(edge - direction * 8, wakeY);
+        context.quadraticCurveTo(edge + direction * 10, wakeY + 4,
+          edge + direction * (20 + Math.sin(time * 2) * 4), wakeY + 2);
+        context.stroke();
+      }
+      context.restore();
     }
 
     function drawRaft() {
@@ -474,8 +516,8 @@
       const scene = sceneAt(tower.length - 1);
       drawSky(sceneryTime, scene);
       const onRaft = scene.start === 0;
-      if (onRaft) drawWater(sceneryTime);
       const bob = onRaft ? Math.sin(sceneryTime * 2.4) * 2 : 0;
+      if (onRaft) drawWater(sceneryTime, bob);
       drawLeaderboardTowers(bob);
       context.save();
       context.translate(0, camera + bob);
