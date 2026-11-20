@@ -4,52 +4,79 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Stacker</title>
+  <meta name="description" content="Stack blocks from a raft to deep space and compete for a top-three score.">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap">
   <style>
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100svh;
+      padding: 24px 18px;
       display: grid;
       place-items: center;
-      padding: 24px 16px;
-      background: #101524;
-      color: #f4f6ff;
-      font: 1rem system-ui, sans-serif;
+      color: #fff0d5;
+      background: repeating-linear-gradient(0deg, transparent 0 23px, #643a7325 23px 24px),
+                  radial-gradient(ellipse at top, #432056, #150e24 70%);
+      font: 0.875rem/1.5 ui-monospace, "Courier New", monospace;
     }
-    main { width: min(100%, 390px); }
-    header { display: flex; align-items: baseline; justify-content: space-between; }
-    h1 { margin: 0; font-size: 2.5rem; letter-spacing: -.06em; }
-    #score { font-variant-numeric: tabular-nums; color: #8cebd7; }
-    p { color: #c0c9df; margin: 8px 0 16px; }
+    main {
+      width: min(100%, 430px);
+      padding: 16px;
+      background: #231e26;
+      border: 4px solid #bdb39e; border-left-color: #f1e2c0;
+      box-shadow: 6px 6px 0 #0b0711, inset 0 0 0 2px #140b22;
+    }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+    h1 {
+      margin: 0;
+      font: clamp(1rem, 5vw, 1.7rem)/1.6 "Press Start 2P", monospace;
+      letter-spacing: -.04em;
+      text-transform: uppercase;
+      color: #ffe264;
+      text-shadow: 2px 3px #bd3b74, 4px 5px #100b1b;
+    }
+    #action, #leaderboard h2 { font: .7rem/1.6 "Press Start 2P", monospace; }
+    #score { color: #9cffcd; border: 2px solid #684477; padding: 3px 7px; font-weight: 700; }
+    p { color: #e1cce8; margin: 8px 0 12px; }
+    .screen { position: relative; border: 4px solid #100b1b; outline: 2px solid #744985; }
+    .screen::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg, #10082224 0 1px, transparent 1px 4px);
+    }
     canvas {
       width: 100%;
       max-height: 58svh;
       display: block;
-      border: 1px solid #3c4866;
-      border-radius: 16px;
-      background: #182137;
+      background: #171233;
+      image-rendering: pixelated;
       cursor: pointer;
       touch-action: manipulation;
     }
     button {
       width: 100%;
       margin-top: 12px;
-      padding: 12px;
-      border: 0;
-      border-radius: 10px;
-      background: #8cebd7;
-      color: #101524;
+      padding: 9px;
+      border: 2px solid #fc7775;
+      box-shadow: 0 4px #7c253b;
+      background: #d73749;
+      color: #fff3da;
       font: inherit;
-      font-weight: 700;
+      font-weight: 900;
+      text-transform: uppercase;
       cursor: pointer;
       touch-action: manipulation;
     }
-    #leaderboard { margin-top: 18px; padding: 14px; border: 1px solid #3c4866; border-radius: 12px; }
-    #leaderboard h2 { margin: 0; font-size: 1.125rem; }
-    #leaderboard ol { margin: 8px 0; padding-left: 24px; }
+    button:active { transform: translateY(2px); box-shadow: 0 2px #9a3c73; }
+    :focus-visible { outline: 2px dashed #9cffcd; outline-offset: 3px; }
+    #leaderboard { margin-top: 16px; padding: 10px; border: 2px dashed #744985; }
+    #leaderboard h2 { margin: 0; color: #ffe264; font-size: 1rem; text-transform: uppercase; }
+    #leaderboard ol { margin: 6px 0; padding-left: 24px; }
     #leaderboard p { margin-bottom: 0; }
     #leaderboard input { width: 100%; padding: 8px; font: inherit; }
-    #altitude { margin: 8px 0 0; font-size: .875rem; color: #8cebd7; }
+    #altitude { margin: 12px 0 0; color: #9cffcd; }
     #status { min-height: 1.5em; margin-bottom: 0; }
   </style>
 </head>
@@ -60,9 +87,11 @@
       <span id="score">Score 0</span>
     </header>
     <p>Line up each block with the one below it. Tap the board or press Space to place it.</p>
-    <canvas id="board" width="720" height="900" aria-label="Stacker game board">
+    <div class="screen">
+    <canvas id="board" width="360" height="450" aria-label="Stacker game board">
       Your browser needs canvas support to play Stacker.
     </canvas>
+    </div>
     <button id="action" type="button">Start game</button>
     <p id="altitude">Open sky · Clouds at 10 blocks</p>
     <p id="status" role="status">Ready to play.</p>
@@ -89,23 +118,18 @@
     const height = 450;
     const ground = 406;
     const blockHeight = 26;
-    const colors = ['#8cebd7', '#8db5ff', '#c2aaff', '#ffaecb', '#ffd39a'];
+    const colors = ['#57d894', '#5ca6ec', '#9e83db', '#f087a2', '#ffb75c'];
     let tower;
     let moving;
     let debris;
     let phase;
     let camera;
     let lastFrame;
-    const stoneTexture = new Image();
-    stoneTexture.src = 'stone.webp';
-
     let sceneryTime = 0;
     let goldFlash;
     const flashDuration = 0.28;
     const breakDuration = 0.14;
     const alignmentTolerance = 1.5;
-    const backdrop = new Image();
-    backdrop.src = 'scenery.webp';
 
     function reset() {
       tower = [{ x: 108, width: 144, y: ground - blockHeight, color: colors[0] }];
@@ -181,48 +205,25 @@
     }
 
     function drawBlock(block) {
-      const { x, y, width, color } = block;
-      const faceHeight = blockHeight - 1;
-      const bevel = Math.min(3, width / 3);
-      const gold = color === '#f8bd3d';
-      const lighting = context.createLinearGradient(0, y, 0, y + faceHeight);
-      lighting.addColorStop(0, '#ffffff55');
-      lighting.addColorStop(0.45, '#ffffff00');
-      lighting.addColorStop(1, '#171d2b88');
-
-      context.save();
-      context.beginPath();
-      context.moveTo(x + bevel, y);
-      context.lineTo(x + width - bevel, y);
-      context.lineTo(x + width, y + bevel);
-      context.lineTo(x + width, y + faceHeight - bevel);
-      context.lineTo(x + width - bevel, y + faceHeight);
-      context.lineTo(x + bevel, y + faceHeight);
-      context.lineTo(x, y + faceHeight - bevel);
-      context.lineTo(x, y + bevel);
-      context.closePath();
-      context.fillStyle = color;
-      context.fill();
-      context.clip();
-
-      if (stoneTexture.naturalWidth) {
-        const opacity = context.globalAlpha;
-        context.globalAlpha *= gold ? 0.12 : 0.46;
-        context.drawImage(stoneTexture,
-          (block.textureOffset ?? 0) * 2, 0, width * 2, faceHeight * 2,
-          x, y, width, faceHeight);
-        context.globalAlpha = opacity;
+      const x = Math.round(block.x);
+      const y = Math.round(block.y);
+      const width = Math.max(1, Math.round(block.width));
+      const trim = Math.min(3, width);
+      context.fillStyle = '#21172e';
+      context.fillRect(x, y, width, blockHeight - 1);
+      context.fillStyle = block.color;
+      context.fillRect(x, y + 1, width, blockHeight - 4);
+      context.fillStyle = '#ffffff96';
+      context.fillRect(x, y + 1, width, 3);
+      context.fillRect(x, y + 4, trim, blockHeight - 9);
+      context.fillStyle = '#35164c70';
+      context.fillRect(x + width - trim, y + 4, trim, blockHeight - 9);
+      context.fillRect(x, y + blockHeight - 7, width, 4);
+      context.fillStyle = '#ffffff50';
+      for (let tile = 9; tile + 4 < width; tile += 14) {
+        context.fillRect(x + tile, y + 9, 4, 2);
+        context.fillRect(x + tile + 2, y + 11, 2, 2);
       }
-
-      context.fillStyle = lighting;
-      context.fillRect(x, y, width, faceHeight);
-      context.fillStyle = gold ? '#fff2baaa' : '#ffffff85';
-      context.fillRect(x, y, width, bevel);
-      context.fillRect(x, y + bevel, bevel, faceHeight - bevel);
-      context.fillStyle = '#1a223966';
-      context.fillRect(x, y + faceHeight - bevel, width, bevel);
-      context.fillRect(x + width - bevel, y + bevel, bevel, faceHeight - bevel);
-      context.restore();
     }
 
     function drawDebris(piece) {
@@ -258,10 +259,10 @@
     }
 
     const scenes = [
-      { start: 0, label: 'Open sky · Clouds at 10 blocks', top: '#287faf', bottom: '#c5eef3' },
-      { start: 10, label: 'Clouds · Space at 20 blocks', top: '#519bd1', bottom: '#edf8ff' },
-      { start: 20, label: 'Space · Earth', top: '#080b22', bottom: '#272755' },
-      { start: 30, label: 'Mars surface', top: '#5f2c35', bottom: '#eaa37b' },
+      { start: 0, label: 'Open sky · Clouds at 10 blocks', top: '#2654a8', bottom: '#c5eef3' },
+      { start: 10, label: 'Clouds · Space at 20 blocks', top: '#3157ac', bottom: '#edf8ff' },
+      { start: 20, label: 'Space · Earth', top: '#101330', bottom: '#272755' },
+      { start: 30, label: 'Mars surface', top: '#753657', bottom: '#eaa37b' },
       { start: 40, label: 'Deep space', top: '#000', bottom: '#000' }
     ];
 
@@ -269,195 +270,143 @@
       return scenes.findLast(scene => blocks >= scene.start);
     }
 
-    function ellipse(x, y, rx, ry, color) {
+    function pixels(color, x, y, w, h) {
       context.fillStyle = color;
-      context.beginPath();
-      context.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-      context.fill();
+      context.fillRect(Math.round(x), Math.round(y), w, h);
+    }
+
+    const cloudSprite = [
+      '....1111........',
+      '...122221..11...',
+      '..122222211221..',
+      '.12222222222221.',
+      '1222222222222221',
+      '1333223332223331',
+      '.11111111111111.'
+    ];
+
+    function drawCloud(x, y, size) {
+      const palette = { 1: '#5471b7', 2: '#f8f0dc', 3: '#a7c4ea' };
+      cloudSprite.forEach((row, dy) => {
+        for (let dx = 0; dx < row.length; dx++) {
+          if (row[dx] !== '.') pixels(palette[row[dx]], x + dx * size, y + dy * size, size, size);
+        }
+      });
+    }
+
+    function drawStars(time) {
+      for (let i = 0; i < 68; i++) {
+        const x = (i * 137 + 19) % width;
+        const y = (i * i * 53 + 31) % height;
+        const bright = (Math.floor(time * 3) + i) % 7 === 0;
+        pixels(bright ? '#fff2b8' : '#7182bc', x, y, 2, 2);
+        if (bright) {
+          pixels('#fff2b8', x - 2, y, 6, 2);
+          pixels('#fff2b8', x, y - 2, 2, 6);
+        }
+      }
     }
 
     function drawEarth() {
-      // Follow the smoothed camera so Earth recedes continuously as we climb.
       const orbitStart = 120 - (ground - blockHeight * 22);
-      const progress = Math.max(0, Math.min(1, (camera - orbitStart) / (9 * blockHeight)));
-      const x = 200 + progress * 42;
-      const y = 298 + progress * 84;
-      const radius = 83 - progress * 36;
-
-      if (backdrop.naturalWidth) {
-        // The globe occupies this region of the scenery atlas's lower-left tile.
-        const sx = backdrop.naturalWidth / 1122;
-        const sy = backdrop.naturalHeight / 1402;
-        context.save();
-        context.beginPath();
-        context.arc(x, y, radius, 0, Math.PI * 2);
-        context.clip();
-        context.drawImage(backdrop, 164 * sx, 738 * sy, 232 * sx, 232 * sy,
-          x - radius, y - radius, radius * 2, radius * 2);
-        context.restore();
-        return;
-      }
-      const glow = context.createRadialGradient(x - 17, y - 18, 4, x, y, radius);
-      glow.addColorStop(0, '#83ebf1');
-      glow.addColorStop(1, '#245bb6');
-      ellipse(x, y, radius + 2, radius + 2, '#89caff66');
-      ellipse(x, y, radius, radius, glow);
-
-      context.save();
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.clip();
-      ellipse(x - 15, y - 9, 17, 9, '#61bb87');
-      ellipse(x - 8, y + 2, 8, 16, '#61bb87');
-      ellipse(x + 23, y + 13, 11, 7, '#69c09a');
-      ellipse(x + 13, y - 23, 26, 3, '#ffffff80');
-      context.restore();
-    }
-
-    function drawStars() {
-      for (let i = 0; i < 76; i++) {
-        const x = (i * 137 + 19) % width;
-        const y = (i * i * 53 + 31) % height;
-        const radius = i % 9 === 0 ? 1.6 : 0.8;
-        ellipse(x, y, radius, radius, i % 3 === 0 ? '#eef3ff' : '#a5b4e288');
+      const climb = Math.max(0, Math.min(1, (camera - orbitStart) / (9 * blockHeight)));
+      const size = Math.round(8 - climb * 3);
+      const centerX = 207 + climb * 36;
+      const centerY = 296 + climb * 84;
+      const continents = [
+        '................', '.....###........', '...######...#...',
+        '..######...###..', '...####...####..', '....##....#####.',
+        '.....##...###...', '......#....###..', '....####....##..',
+        '.....####....#..', '......##........', '......##....##..',
+        '......#....###..', '.......#........', '................',
+        '................'
+      ];
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 16; x++) {
+          const distance = Math.hypot(x - 7.5, y - 7.5);
+          if (distance > 8) continue;
+          const land = continents[y][x] === '#';
+          const color = distance > 7.1 ? '#8cdaff'
+            : land ? (x + y > 17 ? '#227c68' : '#70d66b')
+            : x + y > 18 ? '#124197' : '#2689e4';
+          pixels(color, centerX + (x - 8) * size, centerY + (y - 8) * size, size, size);
+        }
       }
     }
 
     function drawMars() {
       const ridges = [
-        { color: '#ae5e4f', y: 290, points: [46, -35, 90, 5, 143, -24, 190, 11, 263, -49, 320, 8] },
-        { color: '#8c453d', y: 337, points: [40, 12, 116, -18, 161, 6, 230, -14, 295, 14] },
-        { color: '#67332f', y: 389, points: [64, -10, 136, 12, 220, -12, 298, 8] }
+        { y: 273, color: '#873a50', peaks: [0, 8, 24, 40, 31, 12, 6, 17, 35, 48, 28, 6] },
+        { y: 323, color: '#a74932', peaks: [18, 26, 12, 2, 8, 19, 29, 20, 8, 1, 10, 20] },
+        { y: 365, color: '#d17b43', peaks: [6, 14, 20, 12, 8, 14, 6, 3, 3, 12, 21, 18] }
       ];
-      for (const ridge of ridges) {
-        context.fillStyle = ridge.color;
-        context.beginPath();
-        context.moveTo(0, ridge.y);
-        for (let i = 0; i < ridge.points.length; i += 2) {
-          context.lineTo(ridge.points[i], ridge.y + ridge.points[i + 1]);
+      for (const { y, color, peaks } of ridges) {
+        for (let x = 0; x < width; x += 4) {
+          const step = x / 32;
+          const i = Math.floor(step);
+          const rise = peaks[i] + ((peaks[i + 1] ?? peaks[i]) - peaks[i]) * (step - i);
+          const top = y - Math.round(rise / 4) * 4;
+          pixels(color, x, top, 4, height - top);
         }
-        context.lineTo(width, ridge.y);
-        context.lineTo(width, height);
-        context.lineTo(0, height);
-        context.closePath();
-        context.fill();
       }
-      ellipse(75, 415, 29, 6, '#49252288');
-      ellipse(283, 433, 46, 9, '#49252288');
-    }
-
-    function drawCloud(x, y, scale, color) {
-      ellipse(x, y, 48 * scale, 12 * scale, color);
-      ellipse(x - 16 * scale, y - 7 * scale, 22 * scale, 15 * scale, color);
-      ellipse(x + 12 * scale, y - 13 * scale, 25 * scale, 20 * scale, color);
+      for (let i = 0; i < 31; i++) {
+        const x = (i * 97 + 13) % width;
+        const y = 373 + (i * 19) % 74;
+        const size = 5 + i % 5 * 3;
+        pixels('#8c4237', x, y, size, 4);
+        pixels('#eba65e', x + 2, y - 2, size - 3, 2);
+      }
     }
 
     function drawSky(time, scene) {
-      if (scene.start < 40 && scene.start !== 20 && backdrop.naturalWidth) {
-        const tileWidth = backdrop.naturalWidth / 2;
-        const tileHeight = backdrop.naturalHeight / 2;
-        const tile = scene.start / 10;
-        const padding = 8;
-        context.drawImage(backdrop,
-          (tile % 2) * tileWidth + padding, Math.floor(tile / 2) * tileHeight + padding,
-          tileWidth - padding * 2, tileHeight - padding * 2, 0, 0, width, height);
+      pixels(scene.top, 0, 0, width, height);
+      if (scene.start === 20 || scene.start === 40) {
+        drawStars(time);
+        if (scene.start === 20) drawEarth();
         return;
       }
-      const sky = context.createLinearGradient(0, 0, 0, height);
-      sky.addColorStop(0, scene.top);
-      sky.addColorStop(1, scene.bottom);
-      context.fillStyle = sky;
-      context.fillRect(0, 0, width, height);
-
+      const bands = scene.start === 30 ? ['#ac5260', '#d88064'] : ['#387bd0', '#5ba9ec'];
+      bands.forEach((color, index) => pixels(color, 0, 135 + index * 80, width, height));
       if (scene.start === 30) {
         drawMars();
         return;
       }
-      if (scene.start >= 20) {
-        drawStars();
-        if (scene.start === 20) drawEarth();
-        return;
+      if (scene.start === 0) {
+        pixels('#ffe28a', 262, 40, 32, 24);
+        pixels('#ffe28a', 266, 36, 24, 32);
       }
-
-      const cloudLayer = scene.start === 10;
-      if (!cloudLayer) ellipse(279, 62, 25, 25, '#fff2ba');
-      const count = cloudLayer ? 9 : 5;
-      for (let i = 0; i < count; i++) {
-        const x = ((i * 143 + time * (8 + i)) % (width + 190)) - 95;
-        const y = cloudLayer ? 48 + i * 46 : 35 + i * 54 + camera * 0.20;
-        const scale = cloudLayer ? 1.2 + (i % 3) * 0.22 : 0.9;
-        drawCloud(x, y, scale, cloudLayer ? '#f7fcffe8' : '#f3fcffbb');
+      const clouds = scene.start === 10 ? 11 : 5;
+      for (let i = 0; i < clouds; i++) {
+        const x = Math.floor((i * 127 + time * (6 + i % 4)) % (width + 105)) - 100;
+        const y = 51 + i * (scene.start === 10 ? 34 : 51);
+        drawCloud(x, y, scene.start === 10 ? 4 + i % 3 : 3);
       }
     }
 
     function drawWater(time, bob) {
-      const surface = ground + camera + 10;
-      if (surface >= height + 8) return;
-      const waveY = x => surface + Math.sin(x / 32 - time * 2.2) * 2
-        + Math.sin(x / 12 + time * 1.4) * 0.8;
-
-      context.save();
-      context.beginPath();
-      context.moveTo(0, height);
-      for (let x = 0; x <= width; x += 4) context.lineTo(x, waveY(x));
-      context.lineTo(width, height);
-      context.closePath();
-      context.clip();
-
-      const shading = context.createLinearGradient(0, surface, 0, surface + 38);
-      shading.addColorStop(0, '#397ba7');
-      shading.addColorStop(1, '#133f66');
-      context.fillStyle = shading;
-      context.fillRect(0, surface - 4, width, 42);
-
-      if (backdrop.naturalWidth) {
-        // Sample the photographed ocean at the bottom of the upper-left tile.
-        const sx = backdrop.naturalWidth / 1122;
-        const sy = backdrop.naturalHeight / 1402;
-        for (let row = 0; row < 40; row += 2) {
-          const drift = Math.sin(row * 0.31 - time * 2.5) * (6 + row * 0.23);
-          context.drawImage(backdrop, 28 * sx, (659 + row * 0.9) * sy,
-            505 * sx, 3 * sy, drift - 22, surface - 4 + row, width + 44, 2);
+      const surface = Math.round(ground + camera + bob + 9);
+      if (surface >= height) return;
+      pixels('#174f9b', 0, surface, width, height - surface);
+      const phase = Math.floor(time * 9);
+      for (let row = 0; row < height - surface; row += 7) {
+        for (let x = 0; x < width; x += 4) {
+          const tile = (x / 4 + phase + row * 3) % 19;
+          if (tile < 6) pixels(row === 0 ? '#a1e8ec' : '#489dd8', x, surface + row, 4, 2);
+          if (tile > 13) pixels('#226cba', x, surface + row + 3, 4, 2);
         }
       }
-
-      for (let ripple = 0; ripple < 18; ripple++) {
-        const x = ((ripple * 73 + time * (11 + ripple % 5)) % (width + 36)) - 18;
-        const depth = 3 + (ripple * 13) % 29;
-        const y = waveY(x) + depth;
-        const length = 4 + (ripple % 6) * 2;
-        const shimmer = 0.11 + 0.13 * (1 + Math.sin(time * 3 + ripple)) / 2;
-        context.strokeStyle = 'rgba(218, 246, 255, ' + shimmer + ')';
-        context.lineWidth = 0.8;
-        context.beginPath();
-        context.moveTo(x, y);
-        context.quadraticCurveTo(x + length / 2, y - 1.8, x + length, y);
-        context.stroke();
-      }
-
-      const wakeY = ground + camera + bob + 15;
-      context.strokeStyle = '#d8f5ff70';
-      context.lineWidth = 1.25;
-      for (const edge of [82, 278]) {
-        const direction = edge === 82 ? -1 : 1;
-        context.beginPath();
-        context.moveTo(edge - direction * 8, wakeY);
-        context.quadraticCurveTo(edge + direction * 10, wakeY + 4,
-          edge + direction * (20 + Math.sin(time * 2) * 4), wakeY + 2);
-        context.stroke();
-      }
-      context.restore();
     }
 
     function drawRaft() {
-      context.fillStyle = '#704327';
-      context.fillRect(82, ground, 196, 15);
-      context.fillStyle = '#c88a50';
-      context.fillRect(82, ground, 196, 6);
-      for (let x = 94; x < 278; x += 24) {
-        context.fillStyle = '#dfaa71';
-        context.fillRect(x, ground + 2, 3, 12);
+      pixels('#301921', 78, ground, 204, 15);
+      pixels('#db8d42', 82, ground, 196, 5);
+      pixels('#9d4930', 82, ground + 5, 196, 7);
+      for (let x = 90; x < 275; x += 18) {
+        pixels('#63302c', x, ground + 4, 2, 8);
+        pixels('#f6bd62', x + 2, ground + 2, 7, 2);
       }
+      pixels('#f9e1a1', 98, ground + 1, 7, 10);
+      pixels('#f9e1a1', 255, ground + 1, 7, 10);
     }
 
     let leaderboardTowers = [];
@@ -512,7 +461,7 @@
 
       const target = Math.max(0, 120 - (moving?.y ?? tower.at(-1).y - blockHeight));
       camera += (target - camera) * Math.min(1, elapsed * 10);
-      context.setTransform(2, 0, 0, 2, 0, 0);
+      context.imageSmoothingEnabled = false;
       const scene = sceneAt(tower.length - 1);
       drawSky(sceneryTime, scene);
       const onRaft = scene.start === 0;
@@ -528,8 +477,6 @@
         if (goldFlash > 0) {
           context.save();
           context.globalAlpha = Math.min(1, goldFlash / 0.14);
-          context.shadowColor = '#ffd76a';
-          context.shadowBlur = 12;
           drawBlock({ ...block, color: '#f8bd3d' });
           context.restore();
         }
